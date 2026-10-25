@@ -1,0 +1,54 @@
+# HALT_REQ / resume: takes effect at the next
+# command-buffer boundary -- the current ring packet (and a whole IB)
+# finishes, but already-pending ring packets are NOT drained.  STOPPED +
+# IRQ_CP_STOPPED; further doorbells stay stopped; HALT_REQ=0 resumes.
+init 10
+ctrl 0
+ctrl 1
+irqclear
+# IB: SET_SHADER + DISPATCH (16 dwords)
+ib 1 0x100000000 0x000B0006 0x00100000 0x1 0x0 0x20 0x0 0x0 0x0 0x0 32 1 1
+ib 1 0x100000030 0x00030005 2 1 1
+# ring: INDIRECT, NOP, NOP
+ring 0x00040001 0x00000000 0x1 16 1
+ring 0x00000000
+ring 0x00000000
+# ENABLE|HALT_REQ: nothing is in flight (no doorbell yet, WPTR=0), so the
+# CP stops at once with IDLE set; the pending INDIRECT stays unconsumed
+ctrl 5
+check mmio 0x118 0x19
+check rptr 0
+check irq 0x10
+check mmio 0x114 0x5
+check ndispatch 0
+# a doorbell while STOPPED does not restart processing (now !IDLE)
+ring 0x00000000
+doorbell
+check mmio 0x118 0x18
+check rptr 0
+# resume: HALT_REQ=0 clears STOPPED and drains the ring
+ctrl 1
+check rptr 8
+check mmio 0x118 0x11
+check ndispatch 1
+# an in-flight IB completes before HALT_REQ applies: block the IB on
+# WAIT_MEM, satisfy it and set HALT_REQ in the same step -- the IB runs to
+# its end (RPTR passes the INDIRECT) and the CP stops at the boundary
+poke 1 0x100100000 0x0
+ib 1 0x100000000 0x000B0006 0x00100000 0x1 0x0 0x20 0x0 0x0 0x0 0x0 32 1 1
+ib 1 0x100000030 0x00070009 0x00100000 0x1 0x1 0x0 0xFFFFFFFF 0x0 0x0
+ib 1 0x100000050 0x00030005 1 1 1
+ring 0x00040001 0x00000000 0x1 24 1
+ring 0x00000000
+doorbell
+check mmio 0x118 0x14
+check rptr 8
+poke 1 0x100100000 0x1
+ctrl 5
+check rptr 13
+check mmio 0x118 0x18
+check ndispatch 2
+ctrl 1
+check rptr 14
+check mmio 0x118 0x11
+check error 0 0 0 0

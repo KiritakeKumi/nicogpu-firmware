@@ -1,0 +1,29 @@
+# CP register block properties (D5); mirrors test_register_block.
+# RO and undefined offsets ignore writes, CTRL.RESET self-clears, SIZE_LOG2 keeps all 32 bits,
+# registers stay readable while CORE_RESET holds the core.
+init 10
+ctrl 0
+ctrl 1
+regw 0x10c 0xffffffff
+regw 0x118 0xffffffff
+regw 0x11c 0xffffffff
+regw 0x12c 0xffffffff
+regw 0x134 0xffffffff
+regw 0x138 0xffffffff
+check mmio 0x10c 0
+check mmio 0x11c 0
+check mmio 0x134 0x00010000
+check mmio 0x138 1
+regw 0x1f0 0x1234
+check mmio 0x1f0 0
+ctrl 3
+check mmio 0x114 1
+regw 0x108 0x2c
+check mmio 0x108 0x2c
+ring 0x00000000
+doorbell
+check error 5 0 0 0
+regw 0x108 10
+ctrl 8
+check mmio 0x108 10
+check mmio 0x138 0

@@ -1,0 +1,54 @@
+# INDIRECT error paths: nested INDIRECT, FENCE.IRQ in an IB, VMID 0,
+# oversized IB, packet running past the IB end, IB fetch fault (attributed
+# to the INDIRECT like the model's prefetch), reserved bits.  Each case
+# recovers with CP_CTRL = ENABLE|RESET (RPTR := WPTR); an INDIRECT is
+# 5 ring dwords.
+init 10
+ctrl 0
+ctrl 1
+irqclear
+regclear
+# A: nested INDIRECT inside the IB -> NOT_PERMITTED
+ib 1 0x100000000 0x00040001 0x0 0x1 4 2
+ring 0x00040001 0x00000000 0x1 5 1
+doorbell
+check error 6 0 0x1101 0
+ctrl 3
+check error 0 0 0 0
+# B: FENCE with IRQ inside the IB -> NOT_PERMITTED (op 2, vmid 1, in IB);
+# the FENCE packet is 6 dwords, so IB_SIZE = 6
+ib 1 0x100000000 0x00050002 0x00200000 0x1 0x0 0x0 0x2
+ring 0x00040001 0x00000000 0x1 6 1
+doorbell
+check error 6 5 0x1102 0
+ctrl 3
+# C: INDIRECT with VMID 0 -> BAD_PACKET at the ring packet
+ring 0x00040001 0x00000000 0x1 1 0
+doorbell
+check error 2 10 0x0001 0
+ctrl 3
+# D: IB_SIZE 0x100001 > 2^20 -> BAD_PACKET
+ring 0x00040001 0x00000000 0x1 0x100001 1
+doorbell
+check error 2 15 0x0001 0
+ctrl 3
+# E: last IB packet (FENCE count 5) runs past IB_SIZE 3 -> BAD_PACKET,
+# latched at the packet header offset 0 inside the IB
+ib 1 0x100000000 0x00050002 0x00200000 0x1
+ring 0x00040001 0x00000000 0x1 3 1
+doorbell
+check error 2 20 0x1102 0
+ctrl 3
+# F: IB fetch fault -> MEM_FAULT attributed to the INDIRECT (vmid 0, ring)
+fault 1 0x100000000 0x100100000
+ring 0x00040001 0x00000000 0x1 4 1
+doorbell
+check error 3 25 0x0001 0
+nofault
+ctrl 3
+# G: INDIRECT IB_VA_LO misaligned (bit 0) -> BAD_PACKET (reserved bits)
+ring 0x00040001 0x00000001 0x1 4 1
+doorbell
+check error 2 30 0x0001 0
+check mmio 0x118 0x13
+check irq 0x2

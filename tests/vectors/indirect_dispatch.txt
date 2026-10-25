@@ -1,0 +1,47 @@
+# The five core packets end to end: INDIRECT into VMID 1, SET_SHADER +
+# SET_USER_REGS + DISPATCH, FENCE (no IRQ) and TIMESTAMP inside the IB.
+# RPTR only moves past the INDIRECT when the whole IB has run; C-INV counts
+# one implicit L1/K/I invalidate per INDIRECT.  IB dwords: SET_SHADER is 12
+# dwords = 0x30 bytes, so the next packet starts at byte offset 0x30.
+init 10
+ctrl 0
+ctrl 1
+irqclear
+regclear
+# IB at VMID 1 VA 0x100000000 (33 dwords):
+#  SET_SHADER: code 0x100100000, entry 0, vregs 32, wg 32x1x1
+ib 1 0x100000000 0x000B0006 0x00100000 0x1 0x0 0x20 0x0 0x0 0x0 0x0 32 1 1
+#  SET_USER_REGS: u0:u1 = 0xDEADBEEF00C0FFEE (count 3, 4 dwords)
+ib 1 0x100000030 0x00030007 0x0 0x00C0FFEE 0xDEADBEEF
+#  SET_USER_REGS: u10 = 0x55 (count 2, 3 dwords)
+ib 1 0x100000040 0x00020007 0xA 0x55
+#  DISPATCH 2x1x1 (4 dwords)
+ib 1 0x10000004C 0x00030005 2 1 1
+#  NOP (1 dword)
+ib 1 0x10000005C 0x00000000
+#  FENCE 64-bit (no IRQ) to 0x100200000 (6 dwords)
+ib 1 0x100000060 0x00050002 0x00200000 0x1 0x11111111 0x22222222 0x1
+#  TIMESTAMP to 0x100200008 (3 dwords)
+ib 1 0x100000078 0x00020003 0x00200008 0x1
+# ring: INDIRECT(va, 33 dwords, vmid 1)
+ring 0x00040001 0x00000000 0x1 33 1
+doorbell
+check rptr 5
+check ndispatch 1
+check dispatches 1
+# idx vmid gx gy gz wgx wgy wgz vregs u0 u1 code_lo
+check dispatch 0 1 2 1 1 32 1 1 32 0x00C0FFEE 0xDEADBEEF 0x00100000
+check mem64 1 0x100200000 0x11111111 0x22222222
+# ticks = 7 packets + 2 retired-instruction groups (harness reports 1/group)
+check ticks 10
+check mem64 1 0x100200008 10 0
+check cache 1 1 1 0 0 0 1
+check error 0 0 0 0
+check idle
+# compute state resets per IB: a second INDIRECT with DISPATCH but no
+# SET_SHADER reports NO_SHADER_STATE (op 5, vmid 1, in IB, offset 0)
+ib 1 0x100000000 0x00030005 1 1 1
+ring 0x00040001 0x00000000 0x1 4 1
+doorbell
+check error 8 5 0x1105 0
+check ndispatch 1

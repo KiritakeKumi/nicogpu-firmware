@@ -1,0 +1,53 @@
+# Ring wrap-around and partial packets: packets crossing
+# the ring end, RPTR as a free-running counter, WPTR-RPTR bound (RING_CONFIG
+# when exceeded), incomplete packets waiting for the next doorbell.
+init 10
+regw 0x150 0x001F0001
+regw 0x154 0x1
+ctrl 0
+ctrl 1
+# round 1: NOP count=700 -> 701 dwords
+ring 0x02BC0000
+ringgen 700 0 0
+doorbell
+check rptr 701
+check wptr 701
+check mem 0 0x1001F0000 701
+# round 2: 701 more -> 1402 total, ring index wraps (1402 mod 1024 = 378)
+ring 0x02BC0000
+ringgen 700 0 0
+doorbell
+check rptr 1402
+check mem 0 0x1001F0000 1402
+# more traffic: 321 dwords (wptr-rptr stays <= 1024)
+ring 0x01400000
+ringgen 320 0 0
+doorbell
+check rptr 1723
+# incomplete packet: header claims COUNT=5, only 2 payload dwords arrived
+ring 0x00050000
+ringgen 2 0 0
+doorbell
+check mmio 0x118 0x10
+check rptr 1723
+# the remaining 3 dwords complete the packet
+ringgen 3 0 0
+doorbell
+check rptr 1729
+check idle
+# WPTR ahead of RPTR by more than the ring size -> RING_CONFIG halt
+doorbell 2754
+check error 5 1729 0 0
+check mmio 0x118 0x13
+# RESET (RPTR := WPTR) then a WRITE_DATA packet spanning the ring end:
+# rptr 2754 mod 1024 = 706, 405 dwords (hdr + 2 addr + 402 data) wrap to 111
+ctrl 3
+ring 0x0194000E 0x00240000 0x1
+ringgen 402 0x50000 1
+doorbell 3159
+check rptr 3159
+check mem 0 0x100240000 0x50000
+check mem 0 0x100240644 0x50191
+check mem 0 0x1001F0000 3159
+check error 0 0 0 0
+check idle

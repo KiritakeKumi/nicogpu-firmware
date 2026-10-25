@@ -1,0 +1,78 @@
+# Copy engine + FILL + WRITE_DATA in the ring (physical addresses):
+# multi-chunk copies clipped at 4 KiB granules (VRAM interleave awareness),
+# byte-granular unaligned copies, SIZE=0 no-ops, mode/flag validation,
+# chunked WRITE_DATA through the 256-byte staging buffer.  COPY and FILL
+# are 8 ring dwords, WRITE_DATA is 3 + N.
+init 10
+ctrl 0
+ctrl 1
+# 2000 sequential dwords (8000 bytes) at 0x100100000, copied to 0x100110000
+ibgen 0 0x100100000 2000 0x10 1
+ring 0x00070004 0x00100000 0x1 0x00110000 0x1 8000 0 0
+doorbell
+check rptr 8
+check mem 0 0x100100000 0x10
+check mem 0 0x100110000 0x10
+check mem 0 0x100111F3C 0x7DF
+check error 0 0 0 0
+# byte copy: 5 bytes from +3 to +1 (unaligned both ends).  Memory bytes:
+#   src:  DD CC BB AA | 44 33 22 11   (poke 0xAABBCCDD, 0x11223344)
+#   copied bytes (src+3..src+7): AA 44 33 22 11
+#   dst:  .. .. .. AA 44 33 22 11     at dst+1
+# so dst dword0 (dst+0) = 0x3344AA00, dword1 (dst+4) = 0x1122.
+poke 0 0x100120000 0xAABBCCDD
+poke 0 0x100120004 0x11223344
+ring 0x00070004 0x00120003 0x1 0x00210001 0x1 5 0 0
+doorbell
+check mem 0 0x100210000 0x3344AA00
+check mem 0 0x100210004 0x1122
+check rptr 16
+# SIZE=0 -> no-op
+ring 0x00070004 0x00100000 0x1 0x00130000 0x1 0 0 0
+doorbell
+check rptr 24
+# MODE=1 (LINEAR_TO_T64K) -> UNSUPPORTED in v0.1
+ring 0x00070004 0x00100000 0x1 0x00130000 0x1 1 0 1
+doorbell
+check error 7 24 0x4 0
+ctrl 3
+# MODE=3 -> BAD_PACKET
+ring 0x00070004 0x00100000 0x1 0x00130000 0x1 1 0 3
+doorbell
+check error 2 32 0x4 0
+ctrl 3
+# reserved FLAGS bit -> BAD_PACKET
+ring 0x00070004 0x00100000 0x1 0x00130000 0x1 1 0 0x10
+doorbell
+check error 2 40 0x4 0
+ctrl 3
+# FILL 8 bytes of 0xDEADBEEF
+ring 0x0005000B 0x00220000 0x1 8 0 0xDEADBEEF
+doorbell
+check rptr 54
+check mem 0 0x100220000 0xDEADBEEF
+check mem 0 0x100220004 0xDEADBEEF
+# FILL SIZE=0 -> no-op
+ring 0x0005000B 0x00220008 0x1 0 0 0x0
+doorbell
+check rptr 60
+# FILL misaligned dst
+ring 0x0005000B 0x00220009 0x1 4 0 0x0
+doorbell
+check error 2 60 0xB 0
+ctrl 3
+# FILL size not a multiple of 4
+ring 0x0005000B 0x00220010 0x1 6 0 0x0
+doorbell
+check error 2 66 0xB 0
+ctrl 3
+# WRITE_DATA: count 202 = 2 addr + 200 data dwords -> streams in chunks
+ring 0x00CA000E 0x00230000 0x1
+ringgen 200 0x1000 2
+doorbell
+check rptr 275
+check mem 0 0x100230000 0x1000
+check mem 0 0x100230190 0x10C8
+check mem 0 0x10023031C 0x118E
+check error 0 0 0 0
+check idle

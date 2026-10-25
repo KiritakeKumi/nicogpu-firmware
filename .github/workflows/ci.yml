@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Sum of `size -t` over all objects (text+data+bss), bytes
+  NGFW_IMAGE_BUDGET: "65536"
+  NGFW_SRCS: "src/ngfw_core.c src/ngfw_pkt.c src/ngfw_util.c src/ngfw_plat_ibex.c src/ngfw_ibex_main.c"
+
+jobs:
+  host:
+    name: Host build and golden vectors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Freestanding core builds clean (gcc -Werror -pedantic)
+        run: |
+          set -e
+          for f in $NGFW_SRCS; do
+            gcc -std=c99 -Wall -Wextra -Werror -pedantic -ffreestanding \
+                -ffunction-sections -fdata-sections -Iinclude -Os \
+                -c "$f" -o "/tmp/host_$(basename "$f" .c).o"
+          done
+
+      - name: Golden vectors
+        run: |
+          set -e
+          gcc -std=c99 -Wall -Wextra -Iinclude -Itests -o /tmp/ngfw_test \
+              $NGFW_SRCS tests/ngfw_hostplat.c tests/test_main.c
+          /tmp/ngfw_test tests/vectors/manifest.txt
+
+  riscv:
+    name: RV32IMC cross build and link
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf
+
+      - name: Cross compile (rv32imc_zicsr / ilp32, -Werror)
+        run: |
+          set -e
+          mkdir -p /tmp/rv
+          for f in $NGFW_SRCS; do
+            riscv64-unknown-elf-gcc -march=rv32imc_zicsr -mabi=ilp32 \
+                -mcmodel=medany -std=c99 -Wall -Wextra -Werror -pedantic \
+                -ffreestanding -nostdlib -ffunction-sections -fdata-sections \
+                -DNGFW_IBEX -Os -Iinclude -c "$f" -o "/tmp/rv/$(basename "$f" .c).o"
+          done
+          riscv64-unknown-elf-size -t /tmp/rv/*.o
+
+      - name: Undefined-symbol audit
+        run: |
+          python3 tools/check_rv_objs.py --selftest
+          python3 tools/check_rv_objs.py --nm riscv64-unknown-elf-nm /tmp/rv/*.o
+
+      - name: Image size budget
+        run: |
+          total=$(riscv64-unknown-elf-size -t /tmp/rv/*.o | awk 'END { print $4 }')
+          echo "total: $total bytes, budget $NGFW_IMAGE_BUDGET"
+          test "$total" -le "$NGFW_IMAGE_BUDGET"
+
+      - name: Image link
+        run: |
+          set -e
+          march="-march=rv32imc_zicsr -mabi=ilp32"
+          lg=$(riscv64-unknown-elf-gcc $march -print-libgcc-file-name)
+          case "$lg" in *rv32*) ;; *) echo "not an rv32 libgcc"; exit 1;; esac
+          riscv64-unknown-elf-gcc $march -nostdlib -Wl,--gc-sections -T ibex/link.ld ibex/crt0.S /tmp/rv/*.o -lgcc -o /tmp/rv/fw.elf
+          riscv64-unknown-elf-size /tmp/rv/fw.elf

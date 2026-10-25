@@ -1,0 +1,25 @@
+# CP_CTRL.RESET arriving while a dispatch runs. The platform aborts the dispatch (NGFW_DISPATCH_ABORT):
+# not a fault -- no CP_ERROR, no instructions counted, the packet is not retired (RPTR stays), the event loop's
+# CP_CTRL.RESET then empties the ring; a later dispatch runs normally.
+init 10
+ctrl 0
+ctrl 1
+dispabort 1
+ib 1 0x100000000 0x000B0006 0x00100000 0x1 0x0 0x20 0x0 0x0 0x0 0x0 32 1 1
+ib 1 0x100000030 0x00030005 2 1 1
+ring 0x00040001 0x00000000 0x1 16 1
+doorbell
+check error 0 0 0 0
+check ndispatch 1
+check dispatches 1
+check rptr 0
+ctrl 3
+check error 0 0 0 0
+check rptr 5
+# the next dispatch runs
+ring 0x00040001 0x00000000 0x1 16 1
+doorbell
+check error 0 0 0 0
+check ndispatch 2
+check dispatches 2
+check rptr 10

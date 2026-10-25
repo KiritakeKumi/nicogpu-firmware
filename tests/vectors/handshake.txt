@@ -1,0 +1,40 @@
+# Firmware handshake: CORE_RESET release reports versions,
+# sets READY, raises IRQ_CP_FW; heartbeat follows CP activity; CORE_RESET
+# drops READY again. Mirrors test_handshake.
+init 10
+# before release: versions read 0; ring empty => IDLE already set
+check mmio 0x130 0
+check mmio 0x134 0
+check mmio 0x138 0
+check mmio 0x118 0x1
+ctrl 0
+# publish order per spec: FW_VERSION, CMD_VERSION, FW_STATUS.READY, then status
+check regn 4
+check reg 0 0x134 0x00010000
+check reg 1 0x130 0x2
+check reg 2 0x138 0x1
+check reg 3 0x118 0x11
+check irq 0x8
+check mmio 0x138 1
+check mmio 0x130 0x2
+check mmio 0x134 0x00010000
+check mmio 0x118 0x11
+check mmio 0x114 0x0
+ctrl 1
+check mmio 0x114 0x1
+ring 0x00000000
+doorbell
+check rptr 1
+check reg 4 0x10c 1
+check regn 5
+check mmio 0x12c 4
+# holding the core in reset drops READY and latches RPTR := WPTR
+ctrl 8
+check regn 9
+check reg 5 0x138 0
+check reg 6 0x11c 0
+check reg 7 0x10c 1
+check reg 8 0x118 0x1
+check mmio 0x138 0
+check mmio 0x130 0
+check mmio 0x12c 5

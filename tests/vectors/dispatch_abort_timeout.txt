@@ -1,0 +1,55 @@
+# CP_CTRL.RESET aborts a running dispatch, but the SP's in-flight fabric requests do not drain within the
+# hardware watchdog (WDIST_STATUS.ABORT_TIMEOUT; the platform returns NGFW_DISPATCH_ABORT_TIMEOUT).  The packet is
+# handled like the plain abort of dispatch_abort.txt (no CP_ERROR, no interrupt, not retired, the RESET empties the
+# ring), but it is NOT a normal abort: CP_FW_STATUS.ABORT_TIMEOUT (bit 2) is latched and published so the kernel
+# escalates to a GPU-zone reset.  The bit survives CP_CTRL.RESET and later dispatches; only CORE_RESET clears it.
+init 10
+ctrl 0
+ctrl 1
+check mmio 0x138 0x1
+dispaborttmo 1
+ib 1 0x100000000 0x000B0006 0x00100000 0x1 0x0 0x20 0x0 0x0 0x0 0x0 32 1 1
+ib 1 0x100000030 0x00030005 2 1 1
+ring 0x00040001 0x00000000 0x1 16 1
+irqclear
+regclear
+doorbell
+check error 0 0 0 0
+check irq 0
+check ndispatch 1
+check dispatches 1
+check aborttmo 1
+check rptr 0
+check reg 0 0x138 0x5
+check mmio 0x138 0x5
+# the event loop's CP_CTRL.RESET: ring emptied, the bit stays
+ctrl 3
+check error 0 0 0 0
+check rptr 5
+check mmio 0x138 0x5
+# a later dispatch runs normally (the orphaned fabric slots keep it correct); still sticky
+ring 0x00040001 0x00000000 0x1 16 1
+doorbell
+check error 0 0 0 0
+check ndispatch 2
+check dispatches 2
+check aborttmo 1
+check rptr 10
+check mmio 0x138 0x5
+# a second timeout is counted; the published value does not change (no second FW_STATUS write)
+dispaborttmo 1
+ring 0x00040001 0x00000000 0x1 16 1
+regclear
+doorbell
+check ndispatch 3
+check aborttmo 2
+check rptr 10
+check mmio 0x138 0x5
+ctrl 3
+check rptr 15
+# CORE_RESET (firmware reload, level 2 of the kernel's ladder) clears it; after the reboot READY alone
+ctrl 8
+check mmio 0x138 0
+ctrl 0
+check mmio 0x138 0x1
+check aborttmo 2

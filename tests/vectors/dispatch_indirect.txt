@@ -1,0 +1,50 @@
+# DISPATCH_INDIRECT: grid read from memory at execute
+# time, shader state checked before the read, argument faults, misaligned
+# args, and SHADER_FAULT propagation from a trapped dispatch.
+# SET_SHADER is 12 dwords, so DISPATCH_INDIRECT lands at byte offset 0x30.
+init 10
+ctrl 0
+ctrl 1
+# args {2,1,1} at 0x100040000
+poke 1 0x100040000 2 1 1
+ib 1 0x100000000 0x000B0006 0x00100000 0x1 0x0 0x20 0x0 0x0 0x0 0x0 32 1 1
+ib 1 0x100000030 0x00020008 0x00040000 0x1
+ring 0x00040001 0x00000000 0x1 15 1
+doorbell
+check ndispatch 1
+check dispatch 0 1 2 1 1 32 1 1 32 0 0 0x00100000
+check rptr 5
+check error 0 0 0 0
+# args read fault -> MEM_FAULT (op 8, vmid 1, in IB)
+fault 1 0x100040000 0x100050000
+ib 1 0x100000000 0x000B0006 0x00100000 0x1 0x0 0x20 0x0 0x0 0x0 0x0 32 1 1
+ib 1 0x100000030 0x00020008 0x00040000 0x1
+ring 0x00040001 0x00000000 0x1 15 1
+doorbell
+check error 3 5 0x1108 12
+ctrl 3
+# without SET_SHADER -> NO_SHADER_STATE (checked before the arg read)
+nofault
+ib 1 0x100000000 0x00020008 0x00040000 0x1
+ring 0x00040001 0x00000000 0x1 3 1
+doorbell
+check error 8 10 0x1108 0
+ctrl 3
+# misaligned args -> BAD_PACKET
+poke 1 0x100040004 2 1 1
+ib 1 0x100000000 0x000B0006 0x00100000 0x1 0x0 0x20 0x0 0x0 0x0 0x0 32 1 1
+ib 1 0x100000030 0x00020008 0x00040001 0x1
+ring 0x00040001 0x00000000 0x1 15 1
+doorbell
+check error 2 15 0x1108 12
+ctrl 3
+# trapped dispatch -> SHADER_FAULT; the attempt is counted and recorded
+dispfail 1
+ib 1 0x100000000 0x000B0006 0x00100000 0x1 0x0 0x20 0x0 0x0 0x0 0x0 32 1 1
+ib 1 0x100000030 0x00030005 1 1 1
+ring 0x00040001 0x00000000 0x1 16 1
+doorbell
+check error 4 20 0x1105 12
+check dispatches 2
+check ndispatch 2
+check mmio 0x118 0x13

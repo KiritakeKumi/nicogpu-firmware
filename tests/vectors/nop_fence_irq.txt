@@ -1,0 +1,38 @@
+# Ring data packets: NOP payload ignored, FENCE 64/32-bit write-back, IRQ,
+# L2_WB accounting, RPTR write-back page in host memory.
+# Mirrors test_data_packets (ring part). VAs are 0x1_xxxxxxxx.
+init 10
+# enable RPTR write-back to 0x1001F0000 (bit0 = enable)
+regw 0x150 0x001F0001
+regw 0x154 0x1
+ctrl 0
+ctrl 1
+irqclear
+regclear
+# NOP count=2 with junk payload (3 dwords)
+ring 0x00020000 0xffffffff 0x12345678
+# FENCE 64-bit | IRQ | L2_WB to 0x100100000, value 0x1122334455667788 (6 dwords)
+ring 0x00050002 0x00100000 0x1 0x55667788 0x11223344 0x7
+# FENCE 32-bit to 0x100100008 over a pre-existing 64-bit value (6 dwords)
+poke64 0 0x100100008 0x12345678 0x9abcdef0
+ring 0x00050002 0x00100008 0x1 0xaabbccdd 0x0 0x0
+doorbell
+check rptr 15
+check mem64 0 0x100100000 0x55667788 0x11223344
+check mem64 0 0x100100008 0xaabbccdd 0x9abcdef0
+check irq 0x1
+check cache 0 0 0 1 0 0 0
+check ticks 3
+check error 0 0 0 0
+check idle
+check mem 0 0x1001F0000 15
+check regn 3
+check reg 0 0x10c 3
+check reg 1 0x10c 9
+check reg 2 0x10c 15
+# CACHE WAIT_IDLE|INV_L1|WB_L2 (2 dwords)
+ring 0x0001000A 0x13
+doorbell
+check rptr 17
+check cache 1 0 0 2 0 1 0
+check mem 0 0x1001F0000 17

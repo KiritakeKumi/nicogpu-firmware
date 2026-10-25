@@ -1,0 +1,33 @@
+# QUERY snapshots: OCCLUSION writes 0; PIPELINE_STATS
+# writes 11 u64 slots with only slot 10 (CS invocations) maintained =
+# sum over dispatches of grid * wg threads.  IB offsets: SET_SHADER 12 dw,
+# DISPATCH 4 dw, QUERY 4 dw.
+init 10
+ctrl 0
+ctrl 1
+# IB: SET_SHADER (wg 64x2x1 = 128 threads), DISPATCH 2x1x1, DISPATCH 1x2x3,
+# QUERY occlusion, QUERY pipeline stats (28 dwords)
+ib 1 0x100000000 0x000B0006 0x00100000 0x1 0x0 0x20 0x0 0x0 0x0 0x0 64 2 1
+ib 1 0x100000030 0x00030005 2 1 1
+ib 1 0x100000040 0x00030005 1 2 3
+ib 1 0x100000050 0x0003000C 0x00200000 0x1 0x0
+ib 1 0x100000060 0x0003000C 0x00200010 0x1 0x1
+ring 0x00040001 0x00000000 0x1 28 1
+doorbell
+check rptr 5
+check ndispatch 2
+check dispatch 1 1 1 2 3 64 2 1 0x20 0 0 0x00100000
+# occlusion: 1 x u64 = 0
+check mem64 1 0x100200000 0 0
+# pipeline stats: slot 0 and 9 zero, slot 10 = 2*128 + 6*128 = 1024
+check mem64 1 0x100200010 0 0
+check mem64 1 0x100200058 0 0
+check mem64 1 0x100200060 1024 0
+# ticks: 6 packets + (2 + 6) instruction groups = 14
+check ticks 14
+check error 0 0 0 0
+# misaligned QUERY address -> BAD_PACKET
+ib 1 0x100000000 0x0003000C 0x00200004 0x1 0x0
+ring 0x00040001 0x00000000 0x1 4 1
+doorbell
+check error 2 5 0x110C 0
