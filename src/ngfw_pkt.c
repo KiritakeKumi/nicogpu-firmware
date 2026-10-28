@@ -6,8 +6,8 @@
 // the model; the golden-vector tests pin them.
 #include "ngfw_internal.h"
 
-// Payload dword i (1..count); the payload is pre-fetched into p->buf.
-#define DW(i) (p->buf[(i)-1])
+// Payload dword i (1..count); the payload is pre-fetched into p->raw.
+#define DW(i) (p->raw[(i)])
 
 // Bytes until the next 4 KiB granule boundary.  The VRAM interleave
 // hands every 4 KiB granule to a different DDR
@@ -44,6 +44,7 @@ static ngfw_res exec_indirect(ngfw_ctx *c, ngfw_pkt *p) {
   c->ib.pos = 0;
   c->ib.size = size;
   c->ib.va = ngfw_lohi(DW(1), DW(2));
+  c->ib.win.n = 0;
   begin_ib_state(c);
   return NGFW_OK;
 }
@@ -90,7 +91,7 @@ ngfw_res ngfw_do_dispatch(ngfw_ctx *c, unsigned vmid, uint32_t gx, uint32_t gy, 
 }
 
 ngfw_res ngfw_pkt_exec(ngfw_ctx *c, ngfw_pkt *p) {
-  const uint32_t hdr = p->hdr;
+  const uint32_t hdr = p->raw[0];
   const uint8_t op = (uint8_t)(hdr & NGFW_HDR_OPCODE_MASK);
   const uint32_t n = p->count;
   const unsigned vmid = p->vmid;
@@ -102,7 +103,7 @@ ngfw_res ngfw_pkt_exec(ngfw_ctx *c, ngfw_pkt *p) {
   ++c->ticks;  // the functional timestamp advances per packet (model) ...
   ++c->heartbeat;
 
-  // Generic checks, in the order of.
+  // Generic checks, in order.
   const ngfw_pkt_info *pi = ngfw_packet_info(op);
   if (pi == 0) {
     ngfw_fail(c, NGFW_ERR_BAD_OPCODE, "unknown opcode");
@@ -129,9 +130,9 @@ ngfw_res ngfw_pkt_exec(ngfw_ctx *c, ngfw_pkt *p) {
   // WRITE_DATA streams its tail, so neither needs the fixed buffer.
   if (op != NGFW_OP_NOP && op != NGFW_OP_WRITE_DATA) {
     const uint32_t nb = n < NGFW_PKT_BUF_DW ? n : NGFW_PKT_BUF_DW;
-    if (ngfw_pkt_fetch(c, p, 0, nb, p->buf) != 0) return NGFW_ERROR;
+    if (ngfw_pkt_fetch(c, p, 0, nb, &p->raw[1]) != 0) return NGFW_ERROR;
   } else if (op == NGFW_OP_WRITE_DATA) {
-    if (ngfw_pkt_fetch(c, p, 0, 2, p->buf) != 0) return NGFW_ERROR;
+    if (ngfw_pkt_fetch(c, p, 0, 2, &p->raw[1]) != 0) return NGFW_ERROR;
   }
 
   switch (op) {

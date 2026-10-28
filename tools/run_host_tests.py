@@ -59,7 +59,7 @@ def run(cmd, cwd=None, env=None):
 def run_quiet(cmd, env=None):
     # MSVC-built binaries sometimes fail CreateProcess when handed forward-
     # slash paths; pass Windows separators and swallow the compile chatter.
-    args = [str(c).replace("/", "\\") if str(c).startswith("C:/") else str(c)
+    args = [str(c).replace("/", "\\") if str(c).startswith(("fw/", "C:/")) else str(c)
             for c in cmd]
     r = subprocess.run(args, capture_output=True, text=True, env=env)
     if r.stdout:

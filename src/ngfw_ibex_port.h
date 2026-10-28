@@ -1,8 +1,8 @@
 // nicoGPU CP firmware -- Ibex private port offsets and MMIO accessors.
 //
-// Single source for the firmware side; the RTL counterpart is the CP port package
-// (kept in sync by a testbench that drives the real firmware through
-// these addresses).  PROVISIONAL.
+// Single source for the firmware side; the RTL counterpart is the CP port
+// package (kept in sync by a testbench that drives the real
+// firmware through these addresses).  PROVISIONAL.
 //
 // NGFW_BUS_HOOK: the simulation build (xsim DPI behavioural CPU) replaces the
 // volatile pointer access by two functions provided by the DPI layer, so the
@@ -34,7 +34,7 @@
 #define P_WDIST_INSTR_HI 0x4cu
 #define P_DEBUG 0x50u
 #define P_WDIST_CTRL 0x54u
-#define P_SP_INV 0x58u  // S5b: write bit0 INV_L1, bit1 INV_K, bit2 INV_I (xg_cp_port sp_inv_o pulses)
+#define P_SP_INV 0x58u  // S5b: write bit0 INV_L1, bit1 INV_K, bit2 INV_I (the port's sp_inv_o pulses)
 #define P_COPY_SRC_LO 0x60u
 #define P_COPY_SRC_HI 0x64u
 #define P_COPY_DST_LO 0x68u
@@ -45,7 +45,7 @@
 #define P_COPY_FILL_VALUE 0x7cu
 #define P_COPY_CTRL 0x80u
 #define P_COPY_STATUS 0x84u
-#define P_TICK 0x90u // bit0: 1 ms tick pending (RO); write 1 clears. Wakes the Ibex through mip.MTIP
+#define P_TICK 0x90u  // bit0: 1 ms tick pending (RO); write 1 clears.  Wakes the Ibex through mip.MTIP
 
 // EVENT bits (host writes that need the firmware).
 #define NGFW_EV_DOORBELL 0x1u
@@ -74,7 +74,7 @@
 // the running dispatch; the Ibex is not reset.
 // bit4 abort_timeout (PROVISIONAL): set when the abort's fabric-drain watchdog (default 2^20 clk_ts, about
 // 10.5 ms) expired with SP fabric slots still allocated; it is set no later than the cycle aborting falls, cleared by
-// the next ABORT write and by CORE_RESET (a GO does not clear it). RMs without read 0. Software reads it
+// the next ABORT write and by CORE_RESET (a GO does not clear it).  RMs without it read 0.  Software reads it
 // only once, after its own abort has drained (busy and aborting both 0), and keeps its own copy.
 #define WDIST_STATUS_BUSY 0x1u
 #define WDIST_STATUS_FAULT 0x2u

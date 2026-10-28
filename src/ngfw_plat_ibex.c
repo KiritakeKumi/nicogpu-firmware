@@ -11,13 +11,13 @@
 
 #include "ngfw_ibex_port.h"
 
-static void mem_wait_done(void) {
-  while ((mm32(port(P_MEM_STATUS)) & MEM_STATUS_BUSY) != 0) {
-  }
-}
-
-static int mem_check_fault(void) {
-  const uint32_t st = mm32(port(P_MEM_STATUS));
+// Waits for the access to finish and returns NGFW_MEM_FAULT (after the W1C) or NGFW_MEM_OK; the status word that
+// shows BUSY clear also carries FAULT, so it is read once.
+static int mem_wait_done(void) {
+  uint32_t st;
+  do {
+    st = mm32(port(P_MEM_STATUS));
+  } while ((st & MEM_STATUS_BUSY) != 0);
   if ((st & MEM_STATUS_FAULT) != 0) {
     mm32_write(port(P_MEM_STATUS), MEM_STATUS_FAULT);  // W1C
     return NGFW_MEM_FAULT;
@@ -25,11 +25,15 @@ static int mem_check_fault(void) {
   return NGFW_MEM_OK;
 }
 
-// One bus access of 1/2/4/8 bytes; `data` is little-endian firmware memory.
+// One bus access of 1/2/4/8 bytes per chunk; `data` is little-endian firmware memory.
 static int mem_access(unsigned vmid, uint64_t va, void *data, uint32_t len, int is_write) {
   uint8_t *p = (uint8_t *)data;
   uint64_t addr = va;
   uint32_t left = len;
+  uint32_t addr_hi = (uint32_t)(addr >> 32);
+  if (len == 0) return NGFW_MEM_OK;
+  mm32_write(port(P_MEM_VMID), vmid);
+  mm32_write(port(P_MEM_ADDR_HI), addr_hi);
   while (left != 0) {
     uint32_t size_log2;
     if ((addr & 7u) == 0 && left >= 8u)
@@ -49,17 +53,18 @@ static int mem_access(unsigned vmid, uint64_t va, void *data, uint32_t len, int 
         else v_hi |= (uint32_t)p[i] << (8u * (i - 4u));
       }
     }
+    if ((uint32_t)(addr >> 32) != addr_hi) {
+      addr_hi = (uint32_t)(addr >> 32);
+      mm32_write(port(P_MEM_ADDR_HI), addr_hi);
+    }
     mm32_write(port(P_MEM_ADDR_LO), (uint32_t)addr);
-    mm32_write(port(P_MEM_ADDR_HI), (uint32_t)(addr >> 32));
-    mm32_write(port(P_MEM_VMID), vmid);
     if (is_write) {
       mm32_write(port(P_MEM_DATA), v_lo);
       if (size_log2 == 3) mm32_write(port(P_MEM_DATA_HI), v_hi);
     }
     mm32_write(port(P_MEM_CTRL),
                MEM_CTRL_OP(is_write ? MEM_OP_WRITE : MEM_OP_READ, size_log2));
-    mem_wait_done();
-    if (mem_check_fault() != NGFW_MEM_OK) return NGFW_MEM_FAULT;
+    if (mem_wait_done() != NGFW_MEM_OK) return NGFW_MEM_FAULT;
     if (!is_write) {
       const uint32_t w_lo = mm32(port(P_MEM_DATA));
       const uint32_t w_hi = (size_log2 == 3) ? mm32(port(P_MEM_DATA_HI)) : 0u;
@@ -106,7 +111,7 @@ static void ibex_sp_inv(uint32_t flags) {
 
 static int ibex_dispatch_req(const ngfw_dispatch_req *req, uint64_t *instructions) {
   // PROVISIONAL request format: 42 dword writes, fixed order, last = GO
-  // (captures them; xg_cp_pkg::xg_cp_wd_req_t).
+  // (captured by the CP port RTL; the work-distributor request struct).
   uint32_t w[42];
   w[0] = (uint32_t)req->vmid | (req->num_vregs << 8);
   w[1] = req->shared_bytes;

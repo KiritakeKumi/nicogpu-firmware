@@ -1,6 +1,6 @@
 # Compute-state rules: DISPATCH needs SET_SHADER in the same IB, empty
 # dispatches are legal and uncounted, SET_USER_REGS range bound, SET_SHADER
-# field validation. Second IB packets start at byte
+# field validation.  Second IB packets start at byte
 # offset 0x30 (SET_SHADER is 12 dwords).
 init 10
 ctrl 0

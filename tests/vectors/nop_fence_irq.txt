@@ -1,6 +1,6 @@
 # Ring data packets: NOP payload ignored, FENCE 64/32-bit write-back, IRQ,
 # L2_WB accounting, RPTR write-back page in host memory.
-# Mirrors test_data_packets (ring part). VAs are 0x1_xxxxxxxx.
+# Mirrors test_data_packets (ring part).  VAs are 0x1_xxxxxxxx.
 init 10
 # enable RPTR write-back to 0x1001F0000 (bit0 = enable)
 regw 0x150 0x001F0001

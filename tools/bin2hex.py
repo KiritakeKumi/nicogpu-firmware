@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Convert a raw little-endian binary (objcopy -O binary of the CP firmware ELF)
 into the $readmemh word file used to preload the Ibex IMEM in simulation
-(xg_cp_ibex_wrap IMAGE_FILE): one 32-bit word per line, zero padded to 4 bytes.
+(ng_cp_ibex_wrap IMAGE_FILE): one 32-bit word per line, zero padded to 4 bytes.
 
   python tools/bin2hex.py fw.bin fw_imem.hex [--words N]
 

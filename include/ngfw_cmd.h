@@ -1,4 +1,4 @@
-// nicoGPU CP firmware -- command-stream constants, command stream v0.2 (frozen).
+// nicoGPU CP firmware -- command-stream constants, command stream v0.3 (frozen).
 //
 // Generated file -- DO NOT EDIT.
 //
@@ -14,7 +14,7 @@
 
 // Versions reported through CP_CMD_VERSION / CP_FW_VERSION.
 #define NGFW_CMD_VERSION_MAJOR 0u
-#define NGFW_CMD_VERSION_MINOR 2u
+#define NGFW_CMD_VERSION_MINOR 3u
 #define NGFW_FW_VERSION_MAJOR 0u
 #define NGFW_FW_VERSION_MINOR 1u
 #define NGFW_FW_VERSION_PATCH 0u
@@ -36,10 +36,20 @@ enum {
   NGFW_OP_QUERY = 0x0c,
   NGFW_OP_SET_PREDICATE = 0x0d,
   NGFW_OP_WRITE_DATA = 0x0e,
-  NGFW_OP_DRAW = 0x10,  // reserved (P2) -> UNSUPPORTED
-  NGFW_OP_DRAW_INDEXED = 0x11,  // reserved (P2) -> UNSUPPORTED
-  NGFW_OP_DRAW_INDIRECT = 0x12,  // reserved (P2) -> UNSUPPORTED
-  NGFW_OP_DRAW_INDEXED_INDIRECT = 0x13,  // reserved (P2) -> UNSUPPORTED
+  NGFW_OP_DRAW = 0x10,  // draft (P2) -> UNSUPPORTED
+  NGFW_OP_DRAW_INDEXED = 0x11,  // draft (P2) -> UNSUPPORTED
+  NGFW_OP_DRAW_INDIRECT = 0x12,  // draft (P2) -> UNSUPPORTED
+  NGFW_OP_DRAW_INDEXED_INDIRECT = 0x13,  // draft (P2) -> UNSUPPORTED
+  NGFW_OP_SET_GEOM_LAUNCH = 0x14,  // draft (P2) -> UNSUPPORTED
+  NGFW_OP_SET_FRAG_SHADER = 0x15,  // draft (P2) -> UNSUPPORTED
+  NGFW_OP_SET_FRAG_USER_REGS = 0x16,  // draft (P2) -> UNSUPPORTED
+  NGFW_OP_SET_RASTER = 0x17,  // draft (P2) -> UNSUPPORTED
+  NGFW_OP_SET_ZS = 0x18,  // draft (P2) -> UNSUPPORTED
+  NGFW_OP_SET_VIEWPORTS = 0x19,  // draft (P2) -> UNSUPPORTED
+  NGFW_OP_SET_FRAG_COUNTERS = 0x1a,  // draft (P2) -> UNSUPPORTED
+  NGFW_OP_BEGIN_PASS = 0x1b,  // draft (P2) -> UNSUPPORTED
+  NGFW_OP_END_PASS = 0x1c,  // draft (P2) -> UNSUPPORTED
+  NGFW_OP_PASS_BARRIER = 0x1d,  // draft (P2) -> UNSUPPORTED
   NGFW_OP_FENCE_WRITE = NGFW_OP_FENCE,
 };
 
@@ -114,7 +124,7 @@ enum {
 #define NGFW_PRED_ENABLE 0x1u
 #define NGFW_PRED_INVERT 0x2u
 
-// Limits (nicogpu_cmd.yaml `limits`).
+// Limits.
 #define NGFW_MAX_IB_DWORDS (1u << 20)   // max INDIRECT size in dwords
 #define NGFW_MAX_WG_THREADS 1024u
 

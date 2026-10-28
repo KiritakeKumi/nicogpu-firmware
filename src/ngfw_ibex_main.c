@@ -4,7 +4,7 @@
 // with -DNGFW_BUS_HOOK -- inside the xsim DPI behavioural CPU, where it is the
 // very same code driving the RTL register block.
 //
-// The BAR0 CP page is a hardware register block. The host
+// The BAR0 CP page is a hardware register block.  The host
 // never talks to this code; it learns about host writes through the EVENT
 // bits of the private port (the level behind the Ibex interrupt) and reads
 // the *current* register values back from the register mirror, so the result

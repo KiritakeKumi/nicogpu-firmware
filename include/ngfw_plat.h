@@ -4,11 +4,11 @@
 // no hardware knowledge.  Everything that touches the device goes through
 // one `ngfw_plat` vtable with two implementations:
 //
-// * host: backed by the golden-vector test
+//   * host: backed by the golden-vector test
 //     harness (flat memory windows, fault-injection regions, dispatch and
 //     register-write recorders).  Used by the host unit tests.
-// * Ibex: volatile MMIO at the PROVISIONAL
-// port addresses below; compiled for the real RV32 target.
+//   * Ibex: volatile MMIO at the PROVISIONAL
+//     port addresses below; compiled for the real RV32 target.
 //
 // Freestanding C99: implementations must not pull in libc or platform headers.
 #ifndef NGFW_PLAT_H
@@ -52,10 +52,10 @@ typedef struct ngfw_plat {
 
   // -- engines ---------------------------------------------------------------
   // Submit one compute dispatch to the work distributor and run it to
-  // completion (synchronous semantics are legal, the
+  // completion (synchronous semantics are legal; the
   // functional model is serial too).  On success return 0 and add the
   // retired instruction count to *instructions (the functional timestamp
-  // source). 1 = shader trap/fault -> SHADER_FAULT.
+  // source).  1 = shader trap/fault -> SHADER_FAULT.
   // NGFW_DISPATCH_ABORT: a CP_CTRL.RESET arrived while the dispatch ran, the
   // dispatch was aborted in the work distributor; not a fault, nothing is reported
   // and the event is left pending for the event loop (as NGFW_MEM_ABORT).
@@ -89,21 +89,21 @@ typedef struct ngfw_plat {
   void (*log)(const char *tag, uint32_t code);
 
   // -- additions (all optional; NULL = old behaviour, so the host
-  // tests and the differential test are unaffected) ---------------
-  // Dedicated Copy-engine requests. `vmid` is the
+  //    tests and the differential test are unaffected) ---------------
+  // Dedicated Copy-engine requests.  `vmid` is the
   // execution VMID of both ends (0 = physical).  The engine copies/fills
   // `size` bytes (byte granularity for COPY, 4-byte multiple for FILL), the
   // call returns when it is done: NGFW_MEM_OK, or NGFW_MEM_FAULT when any
   // access faulted (the engine stops at the faulting access), NGFW_MEM_ABORT
   // when a pending CP_CTRL.RESET stopped it early.  NULL = the
-  // firmware moves the data itself through mem_read/mem_write (path).
+  // firmware moves the data itself through mem_read/mem_write.
   int (*copy_req)(unsigned vmid, uint64_t src, uint64_t dst, uint64_t size);
   int (*fill_req)(unsigned vmid, uint64_t dst, uint64_t size, uint32_t value);
   // Called at the end of every ngfw_service() when the functional timestamp
   // or the heartbeat changed, so the hardware register block (which answers
   // the host) can serve TIMESTAMP_LO/HI and CP_HEARTBEAT.
   void (*publish_aux)(uint64_t ticks, uint32_t heartbeat);
-  // S5b: invalidate the SP's caches. `flags` = NGFW_CACHE_INV_L1 / _INV_K / _INV_I (ngfw_cmd.h; the
+  // S5b: invalidate the SP's caches.  `flags` = NGFW_CACHE_INV_L1 / _INV_K / _INV_I (ngfw_cmd.h; the
   // bit positions of CACHE.FLAGS).  Called by CACHE (after WAIT_IDLE / WB_L2 / INV_L2, in that order) and by the
   // implicit invalidate of every INDIRECT (C-INV); the hardware does the invalidate in the SP's next idle L1D cycle.
   // NULL = nothing to invalidate (host tests, functional model: the counters are the only observable).
@@ -125,7 +125,8 @@ typedef struct ngfw_plat {
 // device over a private 32-bit data bus (Ibex LSU port).  Two regions:
 //
 //   NGFW_IBEX_REG_BASE  (0x40000000)
-//     Window onto the BAR0 CP page: the same offsets as ngfw_regs.h.  Reads return the value the host would read; writes of
+//     Window onto the BAR0 CP page: the same offsets as ngfw_regs.h.
+//     Reads return the value the host would read; writes of
 //     firmware-owned registers are the "publish" path,
 //     writes of other offsets are ignored.
 //

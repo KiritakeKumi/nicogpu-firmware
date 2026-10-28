@@ -1,4 +1,4 @@
-# CP_CTRL.RESET arriving while a dispatch runs. The platform aborts the dispatch (NGFW_DISPATCH_ABORT):
+# CP_CTRL.RESET arriving while a dispatch runs.  The platform aborts the dispatch (NGFW_DISPATCH_ABORT):
 # not a fault -- no CP_ERROR, no instructions counted, the packet is not retired (RPTR stays), the event loop's
 # CP_CTRL.RESET then empties the ring; a later dispatch runs normally.
 init 10
